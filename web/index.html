@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gua Compass Web</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 16px; }
+    .row { display: flex; gap: 8px; margin-bottom: 8px; }
+    select, button { padding: 8px; }
+    #bagua {
+      width: min(86vw, 420px);
+      aspect-ratio: 1;
+      margin-top: 12px;
+      position: relative;
+      transform-origin: center;
+      clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+      background: conic-gradient(from -90deg, #ef5350, #ff9800, #fdd835, #66bb6a, #26c6da, #42a5f5, #7e57c2, #ec407a);
+    }
+    .num {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      font-size: 28px;
+      font-weight: 700;
+      color: #111;
+      text-shadow: 0 1px 2px rgba(255,255,255,.8);
+    }
+    .active { color: #fff; font-size: 34px; }
+  </style>
+</head>
+<body>
+  <h2>Расчет числа Гуа</h2>
+  <div class="row">
+    <select id="gender">
+      <option>Мужской</option>
+      <option>Женский</option>
+    </select>
+    <select id="day"></select>
+    <select id="month"></select>
+    <select id="year"></select>
+    <button id="calc">Рассчитать</button>
+  </div>
+  <div id="result">Ваше число Гуа: —</div>
+  <div id="heading">Азимут: —</div>
+
+  <div id="bagua"></div>
+
+  <script>
+    const bagua = document.getElementById('bagua');
+    const numbers = [9,4,3,8,1,6,7,2]; // N,NE,E,SE,S,SW,W,NW
+    const positions = [
+      [50, 14], [74, 26], [86, 50], [74, 74],
+      [50, 86], [26, 74], [14, 50], [26, 26]
+    ];
+
+    let userGua = null;
+    let headingTrue = 0;
+    let declination = 0;
+
+    for (let i = 0; i < numbers.length; i++) {
+      const el = document.createElement('div');
+      el.className = 'num';
+      el.dataset.num = numbers[i];
+      el.textContent = numbers[i];
+      el.style.left = positions[i][0] + '%';
+      el.style.top = positions[i][1] + '%';
+      bagua.appendChild(el);
+    }
+
+    const day = document.getElementById('day');
+    const month = document.getElementById('month');
+    const year = document.getElementById('year');
+    for (let i=1;i<=31;i++) day.add(new Option(i, i));
+    for (let i=1;i<=12;i++) month.add(new Option(i, i));
+    for (let i=2025;i>=1940;i--) year.add(new Option(i, i));
+
+    function reduce(n){
+      n = Math.abs(n);
+      while (n > 9) n = String(n).split('').reduce((a,b)=>a+Number(b),0);
+      return n;
+    }
+
+    function calcGua(gender, y){
+      const r = reduce(y);
+      let raw;
+      if (y < 2000) raw = gender === 'Мужской' ? 10 - r : 5 + r;
+      else raw = gender === 'Мужской' ? 9 - r : 6 + r;
+      let g = reduce(raw);
+      if (g === 5) g = gender === 'Мужской' ? 2 : 8;
+      if (g === 0) g = gender === 'Мужской' ? 9 : 1;
+      return g;
+    }
+
+    function paintActive(){
+      document.querySelectorAll('.num').forEach(n => {
+        n.classList.toggle('active', Number(n.dataset.num) === userGua);
+      });
+    }
+
+    function renderCompass(){
+      bagua.style.transform = `rotate(${-headingTrue}deg)`;
+      document.querySelectorAll('.num').forEach(n => {
+        n.style.transform = `translate(-50%, -50%) rotate(${headingTrue}deg)`;
+      });
+      document.getElementById('heading').textContent = `Азимут: ${Math.round(headingTrue)}°`;
+    }
+
+    document.getElementById('calc').onclick = () => {
+      userGua = calcGua(document.getElementById('gender').value, Number(year.value));
+      document.getElementById('result').textContent = `Ваше число Гуа: ${userGua}`;
+      paintActive();
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(pos => {
+        // Approx magnetic declination, simplified: using browser does not expose geomagnetic model directly.
+        // Could be replaced by API/model if needed.
+        declination = 0;
+      });
+    }
+
+    window.addEventListener('deviceorientationabsolute', (e) => {
+      if (typeof e.alpha !== 'number') return;
+      headingTrue = (360 - e.alpha + declination + 360) % 360;
+      renderCompass();
+    }, true);
+
+    window.addEventListener('deviceorientation', (e) => {
+      if (typeof e.alpha !== 'number') return;
+      headingTrue = (360 - e.alpha + declination + 360) % 360;
+      renderCompass();
+    }, true);
+  </script>
+</body>
+</html>
